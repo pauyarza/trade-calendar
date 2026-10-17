@@ -1,4 +1,5 @@
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { appDataDir, join } from '@tauri-apps/api/path';
 import Database from '@tauri-apps/plugin-sql';
 
 export type Trade = {
@@ -30,8 +31,13 @@ export type Trade = {
 export type Day = { date: string; plan: string; levels: string };
 
 const db = await Database.load('sqlite:trades.db');
+const capturesDir = await join(await appDataDir(), 'captures');
 
-export const listTrades = () => db.select<Trade[]>('SELECT * FROM trades ORDER BY date, time, id');
+export async function listTrades() {
+  const trades = await db.select<Trade[]>('SELECT * FROM trades ORDER BY date, time, id');
+  await invoke('prune_captures', { keep: trades.flatMap((t) => [t.capture_before, t.capture_after]).filter(Boolean) });
+  return trades;
+}
 
 export async function saveTrade(t: Trade) {
   const { id, ...fields } = t;
@@ -60,4 +66,4 @@ export async function saveCapture(file: Blob) {
   return invoke<string>('save_capture', new Uint8Array(await file.arrayBuffer()), { headers: { ext } });
 }
 
-export const captureSrc = (path: string) => convertFileSrc(path);
+export const captureSrc = (name: string) => convertFileSrc(`${capturesDir}/${name}`);
