@@ -93,6 +93,7 @@ const num = (v: number, d = 2) => Math.abs(v).toLocaleString('ca-ES', { minimumF
 const sign = (v: number) => (v > 0 ? '+' : v < 0 ? '−' : '');
 export const fmtUsd = (v: number | null) => (v == null ? '–' : `${sign(v)}${num(v)} $`);
 export const fmtR = (v: number | null) => (v == null ? '–' : `${sign(v)}${num(v)}R`);
+export const fmtBalance = (v: number) => `${v < 0 ? "−" : ""}${num(v)} $`;
 export const fmtPct = (v: number | null) => (v == null ? '–' : `${Math.round(v * 100)}%`);
 export const fmtPts = (v: number | null) => (v == null ? '–' : num(v));
 

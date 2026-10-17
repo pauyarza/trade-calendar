@@ -45,12 +45,20 @@ fn prune_captures(app: AppHandle, keep: HashSet<String>) -> Result<(), String> {
 }
 
 fn main() {
-    let migrations = vec![Migration {
-        version: 1,
-        description: "create trades and days",
-        sql: include_str!("../schema.sql"),
-        kind: MigrationKind::Up,
-    }];
+    let migrations = vec![
+        Migration {
+            version: 1,
+            description: "create trades and days",
+            sql: include_str!("../schema.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "create accounts",
+            sql: include_str!("../schema_accounts.sql"),
+            kind: MigrationKind::Up,
+        },
+    ];
     tauri::Builder::default()
         .plugin(tauri_plugin_sql::Builder::default().add_migrations("sqlite:trades.db", migrations).build())
         .invoke_handler(tauri::generate_handler![save_capture, prune_captures])

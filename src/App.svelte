@@ -4,9 +4,10 @@
   import Stats from './Stats.svelte';
   import TradeForm from './TradeForm.svelte';
   import { ACCOUNTS, isoDate } from './lib/calc';
-  import { listTrades, type Trade } from './lib/db';
+  import { listBalances, listTrades, saveBalance, type Trade } from './lib/db';
 
   let all = $state<Trade[]>([]);
+  let balances = $state<Record<string, number>>({});
   let view = $state<'calendar' | 'stats'>('calendar');
   let unit = $state<'usd' | 'r'>('usd');
   let account = $state('tots');
@@ -15,8 +16,9 @@
   let editing = $state<Trade | null>(null);
 
   let trades = $derived(account === 'tots' ? all : all.filter((t) => t.account === account));
+  let start = $derived(account === 'tots' ? Object.values(balances).reduce((a, b) => a + b, 0) : (balances[account] ?? 0));
 
-  const reload = async () => (all = await listTrades());
+  const reload = async () => ([all, balances] = await Promise.all([listTrades(), listBalances()]));
   reload();
 
   function shiftMonth(n: number) {
@@ -75,7 +77,7 @@
 
 <main class:full={view === 'stats'}>
   {#if view === 'calendar'}
-    <Calendar {month} {trades} {unit} {selected} onselect={(d) => (selected = d)} onshift={shiftMonth} />
+    <Calendar {month} {trades} {unit} {selected} {start} onselect={(d) => (selected = d)} onshift={shiftMonth} />
     <DayPanel
       date={selected}
       trades={trades.filter((t) => t.date === selected)}
@@ -84,7 +86,16 @@
       onedit={(t) => (editing = { ...t })}
     />
   {:else}
-    <Stats {trades} {unit} />
+    <Stats
+      {trades}
+      {unit}
+      {start}
+      {balances}
+      onbalance={async (name, value) => {
+        await saveBalance(name, value);
+        await reload();
+      }}
+    />
   {/if}
 </main>
 

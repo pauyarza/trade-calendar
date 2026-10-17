@@ -1,8 +1,14 @@
 <script lang="ts">
-  import { checksDone, compliant, fmtPct, fmtR, fmtUsd, pnl, rMult, SETUPS, SKIP_REASONS, stats } from './lib/calc';
+  import { ACCOUNTS, checksDone, compliant, fmtBalance, fmtPct, fmtR, fmtUsd, pnl, rMult, SETUPS, SKIP_REASONS, stats } from './lib/calc';
   import type { Trade } from './lib/db';
 
-  let { trades, unit }: { trades: Trade[]; unit: 'usd' | 'r' } = $props();
+  let { trades, unit, start, balances, onbalance }: {
+    trades: Trade[];
+    unit: 'usd' | 'r';
+    start: number;
+    balances: Record<string, number>;
+    onbalance: (name: string, value: number) => void;
+  } = $props();
 
   let s = $derived(stats(trades));
   let fmt = $derived(unit === 'usd' ? fmtUsd : fmtR);
@@ -24,9 +30,10 @@
   let w = $state(800);
   const h = 260, pad = 36;
   let hover = $state<number | null>(null);
-  let ys = $derived(s.curve.map((p) => (unit === 'usd' ? p.cumUsd : p.cum)));
-  let lo = $derived(Math.min(0, ...ys));
-  let hi = $derived(Math.max(0, ...ys, lo + 1));
+  let base = $derived(unit === 'usd' ? start : 0);
+  let ys = $derived(s.curve.map((p) => (unit === 'usd' ? start + p.cumUsd : p.cum)));
+  let lo = $derived(Math.min(base, ...ys));
+  let hi = $derived(Math.max(base, ...ys, lo + 1));
   const x = (i: number) => pad + (i * (w - 2 * pad)) / Math.max(ys.length - 1, 1);
   const y = (v: number) => h - pad + ((lo - v) * (h - 2 * pad)) / (hi - lo);
   let path = $derived(ys.map((v, i) => `${i ? 'L' : 'M'}${x(i)},${y(v)}`).join(''));
@@ -42,6 +49,7 @@
 <div class="wrap">
   <div class="kpis">
     {#each [
+      { label: 'Saldo', value: fmtBalance(start + s.pnl), sign: 0 },
       { label: 'P&L net', value: fmtUsd(s.pnl), sign: s.pnl },
       { label: 'R acumulada', value: fmtR(s.r), sign: s.r },
       { label: 'Trades', value: String(s.n), sign: 0 },
@@ -59,14 +67,14 @@
   </div>
 
   <div class="card chart" bind:clientWidth={w}>
-    <h3>Corba de capital ({unit === 'usd' ? '$' : 'R'})</h3>
+    <h3>{unit === 'usd' ? `Saldo ($, des de ${fmtBalance(start)})` : 'Corba de capital (R)'}</h3>
     {#if ys.length}
       <svg width={w} height={h} role="img" aria-label="Corba de capital" onmousemove={move} onmouseleave={() => (hover = null)}>
         {#each ticks as v}
           <line class="grid" x1={pad} x2={w - pad} y1={y(v)} y2={y(v)} />
           <text class="tick" x={pad - 6} y={y(v) + 4} text-anchor="end">{unit === 'usd' ? Math.round(v) : v.toFixed(1)}</text>
         {/each}
-        <line class="zero" x1={pad} x2={w - pad} y1={y(0)} y2={y(0)} />
+        <line class="zero" x1={pad} x2={w - pad} y1={y(base)} y2={y(base)} />
         <path d={path} />
         {#if hover != null}
           <line class="cross" x1={x(hover)} x2={x(hover)} y1={pad / 2} y2={h - pad} />
@@ -79,7 +87,7 @@
           <strong>#{hover + 1} · {p.t.date} {p.t.time}</strong>
           <span>{p.t.setup} · {p.t.direction === 'long' ? 'llarg' : 'curt'}</span>
           <span>Trade: <b class={p.r >= 0 ? 'win' : 'loss'}>{unit === 'usd' ? fmtUsd(pnl(p.t)) : fmtR(p.r)}</b></span>
-          <span>Acumulat: <b>{fmt(ys[hover])}</b></span>
+          <span>{unit === 'usd' ? 'Saldo' : 'Acumulat'}: <b>{unit === 'usd' ? fmtBalance(ys[hover]) : fmtR(ys[hover])}</b></span>
         </div>
       {/if}
     {:else}
@@ -98,6 +106,14 @@
         </div>
       {/each}
       <p class="muted small">El backtest mecànic tampoc no les ha de contradir.</p>
+      <h3 class="sub">Capital inicial</h3>
+      {#each ACCOUNTS as a}
+        <label class="balance">
+          <span>{a}</span>
+          <input type="number" step="100" value={balances[a] ?? 0} onchange={(e) => onbalance(a, Number(e.currentTarget.value))} />
+          <span>$</span>
+        </label>
+      {/each}
     </div>
 
     <div class="card box">
@@ -150,7 +166,7 @@
 
 <style>
   .wrap { display: flex; flex-direction: column; gap: 16px; }
-  .kpis { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; }
+  .kpis { display: grid; grid-template-columns: repeat(9, 1fr); gap: 10px; }
   .tile { display: grid; gap: 2px; padding: 12px 14px; }
   .tile span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
   .tile strong { font-size: 20px; }
@@ -181,6 +197,8 @@
   .box { padding: 16px; }
   .goal { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
   .small { font-size: 12px; margin: 8px 0 0; }
+  .sub { margin-top: 16px; }
+  .balance { display: grid; grid-template-columns: 60px 1fr auto; align-items: center; gap: 8px; margin-top: 6px; text-transform: capitalize; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th { text-align: left; font-weight: 500; color: var(--muted); font-size: 11px; text-transform: uppercase; padding: 4px 6px; }
   td { padding: 6px; border-top: 1px solid var(--border); }

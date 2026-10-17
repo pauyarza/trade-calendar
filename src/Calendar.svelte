@@ -1,12 +1,13 @@
 <script lang="ts">
-  import { fmtPct, fmtR, fmtUsd, isoDate, summary } from './lib/calc';
+  import { fmtBalance, fmtPct, fmtR, fmtUsd, isoDate, summary } from './lib/calc';
   import type { Trade } from './lib/db';
 
-  let { month, trades, unit, selected, onselect, onshift }: {
+  let { month, trades, unit, selected, start, onselect, onshift }: {
     month: Date;
     trades: Trade[];
     unit: 'usd' | 'r';
     selected: string;
+    start: number;
     onselect: (d: string) => void;
     onshift: (n: number) => void;
   } = $props();
@@ -31,6 +32,8 @@
   let monthKey = $derived(isoDate(month).slice(0, 7));
   let monthSum = $derived(summary(trades.filter((t) => t.date.startsWith(monthKey))));
   let byDay = $derived(Map.groupBy(trades, (t) => t.date));
+  let monthEnd = $derived(isoDate(new Date(month.getFullYear(), month.getMonth() + 1, 0)));
+  let balance = $derived(start + summary(trades.filter((t) => t.date <= monthEnd)).pnl);
 </script>
 
 <section class="card">
@@ -40,6 +43,7 @@
     <button class="ghost" onclick={() => onshift(1)} aria-label="Mes següent">›</button>
     <div class="kpis">
       <div><span>P&L del mes</span><strong class={monthSum.pnl > 0 ? 'win' : monthSum.pnl < 0 ? 'loss' : ''}>{fmt(monthSum)}</strong></div>
+      <div><span>Saldo a final de mes</span><strong>{fmtBalance(balance)}</strong></div>
       <div><span>Trades</span><strong>{monthSum.n}</strong></div>
       <div><span>Encert</span><strong>{fmtPct(monthSum.winRate)}</strong></div>
       <div><span>R mitjana</span><strong>{fmtR(monthSum.avgR)}</strong></div>

@@ -49,6 +49,14 @@ export async function saveTrade(t: Trade) {
 
 export const deleteTrade = (id: number) => db.execute('DELETE FROM trades WHERE id = $1', [id]);
 
+export async function listBalances() {
+  const rows = await db.select<{ name: string; start_balance: number }[]>('SELECT * FROM accounts');
+  return Object.fromEntries(rows.map((r) => [r.name, r.start_balance]));
+}
+
+export const saveBalance = (name: string, value: number) =>
+  db.execute('UPDATE accounts SET start_balance = $1 WHERE name = $2', [value, name]);
+
 export async function getDay(date: string): Promise<Day> {
   const rows = await db.select<Day[]>('SELECT * FROM days WHERE date = $1', [date]);
   return rows[0] ?? { date, plan: '', levels: '' };
